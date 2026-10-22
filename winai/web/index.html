@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WinAI</title>
+<style>
+:root{--bg:#f3f3f3;--card:#fff;--text:#1b1b1b;--muted:#666;--line:#e3e3e3;--acc:#0067c0;--ok:#0f7b0f;--warn:#9d5d00}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1c1c;--card:#2b2b2b;--text:#f3f3f3;--muted:#a0a0a0;--line:#3a3a3a;--acc:#4cc2ff;--ok:#6ccb5f;--warn:#fce100}}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+nav{width:210px;padding:16px 8px;flex-shrink:0}
+nav h1{font-size:18px;margin:4px 12px 18px}
+nav a{display:block;padding:9px 12px;border-radius:6px;color:var(--text);text-decoration:none;margin-bottom:2px}
+nav a.on{background:var(--card);box-shadow:inset 3px 0 var(--acc)}
+main{flex:1;padding:20px 28px;max-width:1150px}
+section{display:none}section.on{display:block}
+h2{font-size:22px;font-weight:600;margin:4px 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;margin-bottom:12px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input[type=text],textarea,select{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text)}
+input[type=text]{flex:1;min-width:200px}
+textarea{width:100%;min-height:70px}
+button{font:inherit;padding:7px 14px;border-radius:6px;border:1px solid var(--line);background:var(--card);color:var(--text);cursor:pointer}
+button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+@media (prefers-color-scheme:dark){button.pri{color:#000}}
+button:disabled{opacity:.5}
+.muted{color:var(--muted);font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.shot img{width:100%;border-radius:4px;display:block}
+.svc{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--muted);margin-right:6px}
+.dot.on{background:var(--ok)}
+pre{white-space:pre-wrap;font-size:12px;color:var(--muted);max-height:160px;overflow:auto;margin:6px 0 0}
+.canvas-wrap{position:relative;display:inline-block;max-width:100%}
+.canvas-wrap canvas{max-width:100%;border-radius:4px;display:block}
+#paint{position:absolute;left:0;top:0;cursor:crosshair;opacity:.55}
+.result img{max-width:100%;border-radius:6px}
+.msg{padding:8px 12px;border-radius:8px;margin:6px 0;white-space:pre-wrap}
+.msg.user{background:var(--bg);margin-left:20%}
+.msg.assistant{background:var(--card);border:1px solid var(--line);margin-right:10%}
+.file{padding:8px 0;border-bottom:1px solid var(--line)}
+.file b{cursor:pointer;color:var(--acc)}
+@media (max-width:700px){body{display:block}nav{width:auto;display:flex;overflow-x:auto}nav h1{display:none}main{padding:12px 16px}}
+</style>
+</head>
+<body>
+<nav>
+  <h1>WinAI</h1>
+  <a href="#home" data-t="home">Главная</a>
+  <a href="#recall" data-t="recall">Recall</a>
+  <a href="#files" data-t="files">Поиск по файлам</a>
+  <a href="#photo" data-t="photo">Фото</a>
+  <a href="#create" data-t="create">Cocreator</a>
+  <a href="#chat" data-t="chat">Чат</a>
+</nav>
+<main>
+
+<section id="home">
+  <h2>Главная</h2>
+  <div class="card" id="state">Загрузка…</div>
+  <div class="card svc" id="services"></div>
+  <p class="muted">Всё работает на этом компьютере. Включённые службы запустятся сами при следующем старте панели.</p>
+</section>
+
+<section id="recall">
+  <h2>Recall</h2>
+  <div class="card row"><input type="text" id="rq" placeholder="Что вы видели на экране?"><button class="pri" onclick="recallSearch()">Найти</button></div>
+  <div class="grid" id="rres"></div>
+</section>
+
+<section id="files">
+  <h2>Поиск по файлам</h2>
+  <div class="card row"><input type="text" id="fq" placeholder="Опишите, что ищете: «договор аренды прошлым летом»"><button class="pri" onclick="filesSearch()">Найти</button></div>
+  <div class="card">
+    <div class="row"><input type="text" id="fdir" placeholder="Папка для индексации, например C:\Users\Имя\Documents">
+    <label><input type="checkbox" id="fimg"> текст на картинках</label><button onclick="filesIndex()">Проиндексировать</button></div>
+    <pre id="flog"></pre>
+  </div>
+  <div class="card" id="fres"><span class="muted">Сначала проиндексируйте папку.</span></div>
+</section>
+
+<section id="photo">
+  <h2>Фото</h2>
+  <div class="card row">
+    <input type="file" id="pfile" accept="image/*">
+    <button onclick="photoOp('upscale')">Увеличить ×4</button>
+    <button onclick="photoOp('erase')">Удалить закрашенное</button>
+    <label class="muted">кисть <input type="range" id="brush" min="5" max="80" value="30"></label>
+    <button onclick="clearPaint()">Очистить кисть</button>
+  </div>
+  <p class="muted">Чтобы убрать объект, закрасьте его кистью и нажмите «Удалить закрашенное».</p>
+  <div class="canvas-wrap"><canvas id="photoCv"></canvas><canvas id="paint"></canvas></div>
+  <div class="result card" id="pres" hidden></div>
+</section>
+
+<section id="create">
+  <h2>Cocreator</h2>
+  <div class="card">
+    <textarea id="cprompt" placeholder="Опишите картинку (лучше по-английски): a cozy cabin in snowy forest, watercolor"></textarea>
+    <div class="row" style="margin-top:8px">
+      <label><input type="checkbox" id="cuse"> учитывать набросок</label>
+      <label class="muted">свобода <input type="range" id="cstr" min="0.3" max="0.95" step="0.05" value="0.75"></label>
+      <button onclick="sketchClear()">Очистить набросок</button>
+      <button class="pri" onclick="create()">Создать</button>
+    </div>
+  </div>
+  <div class="row" style="align-items:flex-start">
+    <canvas id="sketch" width="512" height="512" style="background:#fff;border-radius:6px;max-width:100%;cursor:crosshair"></canvas>
+    <div class="result" id="cres"></div>
+  </div>
+</section>
+
+<section id="chat">
+  <h2>Чат</h2>
+  <div id="msgs"></div>
+  <div class="card row"><textarea id="cin" placeholder="Спросите что-нибудь. Ctrl+Enter — отправить" style="flex:1"></textarea><button class="pri" onclick="send()">Отправить</button></div>
+  <p class="muted" id="chatinfo"></p>
+</section>
+
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const NAMES = {recall:"Recall — запись экрана", clicktodo:"Click to Do (горячая клавиша)", captions:"Live Captions", studio:"Studio Effects (камера)"};
+
+function route(){
+  const [tab, qs] = (location.hash.slice(1) || "home").split("?");
+  document.querySelectorAll("section").forEach(s => s.classList.toggle("on", s.id === tab));
+  document.querySelectorAll("nav a").forEach(a => a.classList.toggle("on", a.dataset.t === tab));
+  const p = new URLSearchParams(qs || "");
+  if (tab === "recall" && p.get("q")) { $("rq").value = p.get("q"); recallSearch(); }
+  if (tab === "photo" && p.get("file")) loadPhotoUrl("/clips/" + encodeURIComponent(p.get("file")));
+}
+window.addEventListener("hashchange", route);
+
+// ---------- главная ----------
+let lastSvc = "";
+async function refresh(){
+  const s = await (await fetch("/api/status")).json();
+  const p = s.power;
+  $("state").innerHTML = `<div class="row">
+    <span><b>Питание:</b> ${p.battery == null ? "от сети" : p.battery + "% " + (p.plugged ? "(заряжается)" : "(от батареи)")}, режим <b>${p.profile === "eco" ? "экономия" : "производительность"}</b></span>
+    <span><b>Устройства:</b> ${esc(s.devices.join(", ") || "—")}</span>
+    <span><b>Движок:</b> <span class="dot ${s.engine ? "on" : ""}"></span>${s.engine ? "запущен" : "не запущен — используется своя модель"}</span>
+    <span><b>В памяти:</b> ${esc(s.loaded.join(", ") || "ничего")}</span></div>`;
+  $("chatinfo").textContent = s.engine ? "Ответы даёт общий движок " + s.engine_url : "Движок не запущен: при первом сообщении загрузится локальная модель (до минуты).";
+  const key = JSON.stringify(s.services);
+  if (key === lastSvc) return;
+  lastSvc = key;
+  let html = "";
+  for (const [k, v] of Object.entries(s.services)) {
+    html += `<div><span class="dot ${v.running ? "on" : ""}"></span><b>${NAMES[k]}</b> ${opts(k, v)}
+      <pre id="log-${k}" hidden></pre></div>
+      <div class="row"><button onclick="toggleLog('${k}')">Журнал</button>
+      <button class="${v.running ? "" : "pri"}" onclick="svc('${k}', ${!v.running})">${v.running ? "Выключить" : "Включить"}</button></div>`;
+  }
+  $("services").innerHTML = html;
+}
+function opts(k, v){
+  const o = v.opts || {};
+  if (k === "captions") return `<div class="row muted" style="margin-top:4px">
+    <select id="cap-src"><option value="speakers">звук компьютера</option><option value="mic" ${o.source === "mic" ? "selected" : ""}>микрофон</option></select>
+    <select id="cap-tr"><option value="">без перевода</option><option value="ru" ${o.translate === "ru" ? "selected" : ""}>перевод на русский</option><option value="en" ${o.translate === "en" ? "selected" : ""}>перевод на английский</option></select></div>`;
+  if (k === "studio") return `<div class="row muted" style="margin-top:4px">
+    <label><input type="checkbox" id="st-blur" ${o.blur === false ? "" : "checked"}> размытие фона</label>
+    <label><input type="checkbox" id="st-frame" ${o.frame === false ? "" : "checked"}> автокадрирование</label>
+    <label><input type="checkbox" id="st-prev" ${o.preview ? "checked" : ""}> окно предпросмотра</label></div>`;
+  if (k === "clicktodo") return `<div class="muted">Ctrl+Alt+Q → выделите область экрана</div>`;
+  return `<div class="muted">От батареи пишет вдвое реже, ниже 20% — пауза</div>`;
+}
+async function svc(name, on){
+  lastSvc = "";
+  let body = {};
+  if (name === "captions") body = {source: $("cap-src").value, translate: $("cap-tr").value};
+  if (name === "studio") body = {blur: $("st-blur").checked, frame: $("st-frame").checked, preview: $("st-prev").checked};
+  await fetch(`/api/service/${name}/${on ? "start" : "stop"}`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)});
+  refresh();
+}
+async function toggleLog(k){
+  const el = $("log-" + k);
+  el.hidden = !el.hidden;
+  if (!el.hidden) el.textContent = await (await fetch("/api/log/" + k)).text() || "пусто";
+}
+
+// ---------- Recall ----------
+async function recallSearch(){
+  const q = $("rq").value.trim(); if (!q) return;
+  $("rres").innerHTML = '<span class="muted">Ищу…</span>';
+  const res = await (await fetch("/api/recall?q=" + encodeURIComponent(q))).json();
+  $("rres").innerHTML = res.length ? res.map(r => `<div class="card shot"><a href="/img/recall/${r.id}" target="_blank"><img loading="lazy" src="/img/recall/${r.id}"></a>
+    <div>${esc(r.title.slice(0, 70))}</div><div class="muted">${r.when} · ${r.score.toFixed(2)}</div></div>`).join("") : '<span class="muted">Ничего не нашлось.</span>';
+}
+$("rq").addEventListener("keydown", e => e.key === "Enter" && recallSearch());
+
+// ---------- файлы ----------
+async function filesSearch(){
+  const q = $("fq").value.trim(); if (!q) return;
+  $("fres").innerHTML = '<span class="muted">Ищу…</span>';
+  const res = await (await fetch("/api/files?q=" + encodeURIComponent(q))).json();
+  $("fres").innerHTML = res.length ? res.map(r => `<div class="file"><b data-p="${esc(r.path)}" onclick="openFile(this.dataset.p)">${esc(r.path.split(/[\\/]/).pop())}</b>
+    <span class="muted"> · ${r.score.toFixed(2)} · <a href="#" data-p="${esc(r.path)}" onclick="openFile(this.dataset.p, 1);return false">показать в папке</a></span>
+    <div class="muted">${esc(r.path)}</div><div>${esc(r.snippet.slice(0, 220))}…</div></div>`).join("") : '<span class="muted">Ничего не нашлось.</span>';
+}
+$("fq").addEventListener("keydown", e => e.key === "Enter" && filesSearch());
+function openFile(p, folder){ fetch("/api/files/open" + (folder ? "?folder=1" : ""), {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({path: p})}); }
+async function filesIndex(){
+  const r = await fetch("/api/files/index", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({folders: [$("fdir").value.trim()], images: $("fimg").checked})});
+  const j = await r.json();
+  if (j.error) { $("flog").textContent = j.error; return; }
+  const t = setInterval(async () => {
+    const p = await (await fetch("/api/files/progress")).json();
+    $("flog").textContent = p.log.join("\n");
+    if (!p.running) clearInterval(t);
+  }, 1500);
+}
+
+// ---------- фото ----------
+const pc = $("photoCv"), pt = $("paint");
+let photoBlob = null, drawing = false;
+$("pfile").onchange = e => { const f = e.target.files[0]; if (f) loadPhotoUrl(URL.createObjectURL(f)); };
+function loadPhotoUrl(url){
+  const img = new Image();
+  img.onload = () => {
+    pc.width = pt.width = img.naturalWidth; pc.height = pt.height = img.naturalHeight;
+    pc.getContext("2d").drawImage(img, 0, 0);
+    pc.toBlob(b => photoBlob = b, "image/png");
+    clearPaint();
+  };
+  img.src = url;
+}
+function clearPaint(){ pt.getContext("2d").clearRect(0, 0, pt.width, pt.height); }
+function paintAt(e){
+  const r = pt.getBoundingClientRect(), k = pt.width / r.width, c = pt.getContext("2d");
+  c.fillStyle = "#ff2d55"; c.beginPath();
+  c.arc((e.clientX - r.left) * k, (e.clientY - r.top) * k, $("brush").value * k / 2, 0, 7); c.fill();
+}
+pt.onpointerdown = e => { drawing = true; paintAt(e); };
+pt.onpointermove = e => drawing && paintAt(e);
+window.addEventListener("pointerup", () => drawing = false);
+function maskBlob(){
+  return new Promise(res => {
+    const m = document.createElement("canvas"); m.width = pt.width; m.height = pt.height;
+    const c = m.getContext("2d"); c.fillStyle = "#000"; c.fillRect(0, 0, m.width, m.height);
+    c.drawImage(pt, 0, 0);
+    const d = c.getImageData(0, 0, m.width, m.height);
+    for (let i = 0; i < d.data.length; i += 4) { const v = d.data[i] > 40 ? 255 : 0; d.data[i] = d.data[i+1] = d.data[i+2] = v; }
+    c.putImageData(d, 0, 0); m.toBlob(res, "image/png");
+  });
+}
+async function photoOp(op){
+  if (!photoBlob) return alert("Сначала выберите картинку");
+  const fd = new FormData(); fd.append("image", photoBlob, "in.png");
+  if (op === "erase") fd.append("mask", await maskBlob(), "mask.png");
+  $("pres").hidden = false; $("pres").innerHTML = '<span class="muted">Обрабатываю… первый раз модель скачивается</span>';
+  showResult($("pres"), await fetch("/api/photo/" + op, {method:"POST", body: fd}), op === "erase");
+}
+async function showResult(el, r, chain){
+  if (!r.ok) { el.innerHTML = "Ошибка: " + esc((await r.json().catch(() => ({}))).error || r.status); return; }
+  const url = URL.createObjectURL(await r.blob());
+  el.innerHTML = `<img src="${url}"><div class="row" style="margin-top:6px"><a href="${url}" download="winai.png"><button>Сохранить</button></a>
+    ${chain ? '<button id="again">Продолжить с результатом</button>' : ""}</div>`;
+  if (chain) $("again").onclick = () => loadPhotoUrl(url);
+}
+
+// ---------- Cocreator ----------
+const sk = $("sketch"), sc = sk.getContext("2d");
+let sdraw = false;
+function sketchClear(){ sc.fillStyle = "#fff"; sc.fillRect(0, 0, 512, 512); }
+sketchClear();
+sk.onpointerdown = e => { sdraw = true; sc.beginPath(); const p = spos(e); sc.moveTo(p[0], p[1]); };
+sk.onpointermove = e => { if (!sdraw) return; const p = spos(e); sc.lineTo(p[0], p[1]); sc.lineWidth = 6; sc.lineCap = "round"; sc.strokeStyle = "#222"; sc.stroke(); $("cuse").checked = true; };
+window.addEventListener("pointerup", () => sdraw = false);
+function spos(e){ const r = sk.getBoundingClientRect(); return [(e.clientX - r.left) * 512 / r.width, (e.clientY - r.top) * 512 / r.height]; }
+async function create(){
+  const fd = new FormData(); fd.append("prompt", $("cprompt").value); fd.append("strength", $("cstr").value);
+  if ($("cuse").checked) fd.append("sketch", await new Promise(r => sk.toBlob(r, "image/png")), "sketch.png");
+  $("cres").innerHTML = '<span class="muted">Рисую… первый раз модель скачивается (~1 ГБ)</span>';
+  showResult($("cres"), await fetch("/api/photo/create", {method:"POST", body: fd}), false);
+}
+
+// ---------- чат ----------
+const history = [];
+async function send(){
+  const t = $("cin").value.trim(); if (!t) return;
+  $("cin").value = ""; history.push({role:"user", content:t});
+  const box = document.createElement("div"); box.className = "msg user"; box.textContent = t; $("msgs").append(box);
+  const ans = document.createElement("div"); ans.className = "msg assistant"; ans.textContent = "…"; $("msgs").append(ans);
+  const r = await fetch("/api/chat", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({messages: history})});
+  const rd = r.body.getReader(), dec = new TextDecoder(); let out = "";
+  for (;;) { const {done, value} = await rd.read(); if (done) break; out += dec.decode(value, {stream:true}); ans.textContent = out; }
+  history.push({role:"assistant", content:out});
+}
+$("cin").addEventListener("keydown", e => e.key === "Enter" && e.ctrlKey && send());
+
+route(); refresh(); setInterval(refresh, 15000);
+</script>
+</body>
+</html>
