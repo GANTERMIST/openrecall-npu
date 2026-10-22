@@ -3,3 +3,9 @@ data/
 models/
 __pycache__/
 *.pyc
+config.toml
+dist/
+build/
+*.spec
+tools/
+installer/winai.ico

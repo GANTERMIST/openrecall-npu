@@ -1,0 +1,13 @@
+# Скопируйте в config.toml и поменяйте нужное. Все ключи — в winai/config.py.
+
+# Общий движок (npu-llm-hub). Если не запущен — своя модель через OpenVINO GenAI.
+engine_url = "http://127.0.0.1:8100/v1"
+engine_model = "default"
+llm_fallback = "local"          # "off" — не грузить свою LLM никогда
+
+# auto: от батареи — экономия (NPU), от сети — производительность (GPU)
+power_mode = "auto"             # auto | eco | performance
+
+hotkey_clicktodo = "ctrl+alt+q"
+panel_port = 8765
+idle_unload_min = 10            # выгружать модель после N минут простоя
