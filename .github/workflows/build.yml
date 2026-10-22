@@ -1,0 +1,64 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest numpy pillow flask psutil opencv-python-headless pypdf python-docx
+      - run: python -m pytest -q tests
+
+  windows:
+    needs: test
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Версия
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          else echo "VERSION=0.0.${GITHUB_RUN_NUMBER}-dev" >> $GITHUB_ENV; fi
+      - name: WinAI.exe
+        run: |
+          pip install pyinstaller pillow
+          python installer/make_icon.py
+          pyinstaller --onefile --windowed --name WinAI --icon installer/winai.ico launcher.py
+      - name: Установщик
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=$env:VERSION installer\winai.iss
+      - name: Портативный архив
+        run: |
+          New-Item -ItemType Directory portable | Out-Null
+          Copy-Item dist\WinAI.exe, requirements.txt, recall.py, README.md, config.example.toml portable
+          Copy-Item winai portable\winai -Recurse -Exclude __pycache__
+          Compress-Archive portable\* "dist\WinAI-portable-$env:VERSION.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WinAI-${{ env.VERSION }}
+          path: |
+            dist/WinAI-Setup-*.exe
+            dist/WinAI-portable-*.zip
+      - name: Релиз
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/WinAI-Setup-*.exe
+            dist/WinAI-portable-*.zip
+          generate_release_notes: true

@@ -10,6 +10,7 @@
   python -m winai files ...          поиск по файлам по смыслу
   python -m winai photo ...          upscale / erase / create
   python -m winai chat "вопрос"      спросить локальную LLM
+  python -m winai download [--all]   скачать модели заранее (--all — и LLM/Whisper, даже если есть движок)
 """
 import sys
 
@@ -35,6 +36,30 @@ def doctor():
             print(f"  [--] {what}: {type(e).__name__}: {e}")
 
 
+def download(everything=False):
+    """Скачать модели заранее, чтобы функции не ждали при первом использовании."""
+    from PIL import Image
+
+    from . import config, embedder, llm, photos, runtime
+    steps = [("эмбеддинги для поиска", embedder.ensure_model),
+             ("картинки (Cocreator)", lambda: runtime.hf_model(config.get("image_model"))),
+             ("удаление объектов", lambda: runtime.url_file(config.get("inpaint_url"), "lama.onnx")),
+             ("апскейл", lambda: photos.upscale(Image.new("RGB", (8, 8))))]
+    if everything or not llm.engine_up(force=True):
+        steps += [("LLM", lambda: runtime.hf_model(config.get("llm_model"))),
+                  ("Whisper", lambda: runtime.hf_model(config.get("whisper_model"), config.get("whisper_source"),
+                                                       extra=("--weight-format", "fp16")))]
+    failed = 0
+    for name, fn in steps:
+        print(f"== {name}")
+        try:
+            fn()
+        except Exception as e:
+            failed += 1
+            print(f"   не вышло: {e}")
+    print("Модели готовы." if not failed else f"Не скачалось: {failed}. Эти функции докачают модель при первом запуске.")
+
+
 def _log_if_windowless():
     # pythonw.exe (запуск без консоли) не даёт stdout — пишем в файл
     if sys.stdout is None or sys.stderr is None:
@@ -58,6 +83,8 @@ def main(argv=None):
         panel.run(open_browser="--no-browser" not in argv)
     elif cmd == "doctor":
         doctor()
+    elif cmd == "download":
+        download("--all" in argv)
     elif cmd == "recall":
         from . import recall
         recall.main(argv)
